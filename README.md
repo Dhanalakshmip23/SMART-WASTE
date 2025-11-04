@@ -62,20 +62,21 @@ SMART-WASTE/
 └── README.md                  # Project Overview
 
 ---
-
 ##  How to Run the Project
 
-### *Frontend (React)*
-```bash
-cd frontend
-npm install
-npm start
+### 1) Run the Frontend (React App)
+      bash
+      cd frontend
+      npm install
+      npm start
+    After starting, open in your browser:
+    http://localhost:3000
 
-HTML VERSION
-Just Open:
-html-version/index.html
+### 2) View the HTML Version(Static UI)
+    Just open the file:
+    html-version/index.html
 
-## Team Members and Roles
+### Team Members and Roles
 
 1. *Dhanalakshmi P* – Frontend Development (React)
    - Designing the UI screens
