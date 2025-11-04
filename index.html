@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Visionaries — Smart Waste Management</title>
+  <style>
+    :root{
+      --bg:#f7faf7; --card:#ffffff; --accent:#16a34a; --muted:#6b7280;
+      --shadow: 0 6px 18px rgba(15,23,42,0.08);
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    body{ margin:0; background:var(--bg); color:#0f172a; }
+    .container{ max-width:980px; margin:28px auto; padding:20px; }
+    header{ text-align:center; margin-bottom:18px; }
+    h1{ margin:0; font-size:28px; color:var(--accent); }
+    .grid{ display:grid; grid-template-columns: 1fr 420px; gap:18px; align-items:start; }
+    @media (max-width:880px){ .grid{ grid-template-columns: 1fr; } }
+    .card{ background:var(--card); border-radius:12px; padding:16px; box-shadow:var(--shadow); }
+    label{ display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+    input[type="text"], textarea, input[type="file"]{
+      width:100%; padding:10px; border-radius:8px; border:1px solid #e6e9ee; font-size:14px;
+      box-sizing:border-box; outline:none;
+    }
+    textarea{ min-height:110px; resize:vertical; }
+    .btn{
+      background:var(--accent); color:white; padding:9px 14px; border-radius:8px; border:0; cursor:pointer;
+      font-weight:600; box-shadow: 0 6px 12px rgba(16,185,129,0.12);
+    }
+    .btn.secondary{ background:#0369a1; box-shadow:none; }
+    .muted{ color:var(--muted); font-size:13px; }
+    .reports-list{ display:flex; flex-direction:column; gap:10px; }
+    .report-item{ border-radius:10px; padding:12px; background:#fff; border:1px solid #eef2f7; }
+    .report-meta{ display:flex; justify-content:space-between; gap:8px; align-items:center; flex-wrap:wrap; }
+    .status-pill{ padding:6px 10px; border-radius:999px; font-weight:600; font-size:13px; }
+    .status-pending{ background:#fff7ed; color:#b45309; border:1px solid #fcd34d; }
+    .status-resolved{ background:#ecfdf5; color:#065f46; border:1px solid #34d399; }
+    .small{ font-size:13px; color:var(--muted); }
+    .image-preview{ max-width:100%; margin-top:8px; border-radius:8px; border:1px solid #e6e9ee; }
+    .controls{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    .empty{ text-align:center; color:var(--muted); padding:30px 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>♻ Visionaries — Smart Waste Management</h1>
+      <p class="muted">Report overflowing bins and improper disposal. Admins can monitor and resolve reports.</p>
+    </header>
+
+    <div class="grid">
+      <!-- Left: Submit form + recent reports -->
+      <div>
+        <div class="card" id="reportFormCard">
+          <h2 style="margin-top:0">Report a Waste Issue</h2>
+
+          <form id="reportForm">
+            <div style="margin-bottom:10px">
+              <label for="name">Your name</label>
+              <input id="name" name="name" type="text" placeholder="e.g., Anu" required>
+            </div>
+
+            <div style="margin-bottom:10px">
+              <label for="location">Location (address / landmark)</label>
+              <input id="location" name="location" type="text" placeholder="e.g., Park Street, Near Bus Stop" required>
+            </div>
+
+            <div style="margin-bottom:10px">
+              <label for="description">Description</label>
+              <textarea id="description" name="description" placeholder="Describe the issue (overflowing, mixed waste, fire, etc.)" required></textarea>
+            </div>
+
+            <div style="margin-bottom:10px">
+              <label for="image">Optional: Upload an image</label>
+              <input id="image" name="image" type="file" accept="image/*">
+              <img id="imgPreview" class="image-preview" style="display:none" alt="preview">
+            </div>
+
+            <div style="display:flex; gap:8px; align-items:center">
+              <button type="submit" class="btn">Submit Report</button>
+              <button type="button" id="clearBtn" class="btn secondary">Clear</button>
+              <div id="formMsg" class="small" style="margin-left:10px"></div>
+            </div>
+          </form>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3 style="margin-top:0">📋 Recent Reports</h3>
+          <div id="reports" class="reports-list">
+            <div class="empty">Loading reports…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Dashboard / stats -->
+      <aside>
+        <div class="card">
+          <h3 style="margin-top:0">Dashboard</h3>
+          <p class="small">Quick stats & actions</p>
+          <div style="margin-top:12px;">
+            <div id="stats" class="small">Loading stats…</div>
+            <div style="margin-top:10px">
+              <button id="refreshBtn" class="btn" style="width:100%">Refresh</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h3 style="margin-top:0">How it works</h3>
+          <ol class="small">
+            <li>Submit a report with location & optional photo.</li>
+            <li>Municipal team reviews & updates status.</li>
+            <li>Resolved reports are archived for analytics.</li>
+          </ol>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    // === CONFIG: set your backend API base URL here ===
+    const API_URL = "http://localhost:5000/api";
+
+    // UI references
+    const reportsEl = document.getElementById("reports");
+    const statsEl = document.getElementById("stats");
+    const reportForm = document.getElementById("reportForm");
+    const formMsg = document.getElementById("formMsg");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const imgInput = document.getElementById("image");
+    const imgPreview = document.getElementById("imgPreview");
+
+    // Hold current report list
+    let currentReports = [];
+
+    // ---------- helpers ----------
+    function isoDateShort(d) {
+      try { return new Date(d).toLocaleString(); } catch(e){ return d; }
+    }
+
+    function showMessage(el, text, timeout=2500) {
+      el.textContent = text;
+      if (timeout) setTimeout(()=> el.textContent = "", timeout);
+    }
+
+    // ---------- image preview (client-only) ----------
+    imgInput.addEventListener("change", () => {
+      const f = imgInput.files[0];
+      if (!f) { imgPreview.style.display = "none"; return; }
+      const url = URL.createObjectURL(f);
+      imgPreview.src = url;
+      imgPreview.style.display = "block";
+    });
+
+    // ---------- fetch reports from backend ----------
+    async function loadReports() {
+      reportsEl.innerHTML = '<div class="empty">Loading reports…</div>';
+      try {
+        const res = await fetch(API_URL + "/reports");
+        if(!res.ok) throw new Error("Failed to fetch");
+        const data = await res.json();
+        currentReports = data;
+        renderReports();
+        updateStats();
+      } catch (err) {
+        reportsEl.innerHTML = '<div class="empty">Could not load reports. Is the backend running?</div>';
+        statsEl.textContent = "Stats unavailable";
+        console.error(err);
+      }
+    }
+
+    // ---------- render the reports list ----------
+    function renderReports() {
+      if (!currentReports || currentReports.length === 0) {
+        reportsEl.innerHTML = '<div class="empty">No reports yet. Be the first to report!</div>';
+        return;
+      }
+      reportsEl.innerHTML = "";
+      currentReports.forEach(r => {
+        const item = document.createElement("div");
+        item.className = "report-item";
+
+        const meta = document.createElement("div");
+        meta.className = "report-meta";
+        meta.innerHTML = `
+          <div>
+            <strong>${escapeHtml(r.name || "Anonymous")}</strong>
+            <div class="small">${escapeHtml(r.location || "—")}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="small">${isoDateShort(r.createdAt)}</div>
+            <div class="status-pill ${r.status === "Resolved" ? "status-resolved" : "status-pending"}" style="margin-top:6px;">
+              ${escapeHtml(r.status || "Pending")}
+            </div>
+          </div>
+        `;
+
+        const desc = document.createElement("p");
+        desc.style.margin = "10px 0 0";
+        desc.textContent = r.description || "";
+
+        item.appendChild(meta);
+        item.appendChild(desc);
+
+        if (r.imageUrl) {
+          const img = document.createElement("img");
+          img.src = r.imageUrl;
+          img.alt = "report image";
+          img.style.maxWidth = "100%";
+          img.style.marginTop = "10px";
+          img.style.borderRadius = "8px";
+          item.appendChild(img);
+        }
+
+        const controls = document.createElement("div");
+        controls.className = "controls";
+
+        const resolveBtn = document.createElement("button");
+        resolveBtn.className = "btn";
+        resolveBtn.textContent = "Mark Resolved";
+        resolveBtn.disabled = (r.status === "Resolved");
+        resolveBtn.addEventListener("click", () => updateStatus(r._id, "Resolved"));
+
+        const markPendingBtn = document.createElement("button");
+        markPendingBtn.className = "btn secondary";
+        markPendingBtn.textContent = "Mark Pending";
+        markPendingBtn.disabled = (r.status !== "Resolved");
+        markPendingBtn.addEventListener("click", () => updateStatus(r._id, "Pending"));
+
+        controls.appendChild(resolveBtn);
+        controls.appendChild(markPendingBtn);
+
+        item.appendChild(controls);
+        reportsEl.appendChild(item);
+      });
+    }
+
+    // ---------- update a report status ----------
+    async function updateStatus(id, status) {
+      try {
+        const res = await fetch(API_URL + "/reports/" + encodeURIComponent(id), {
+          method: "PATCH",
+          headers: { "Content-Type":"application/json" },
+          body: JSON.stringify({ status })
+        });
+        if (!res.ok) throw new Error("Update failed");
+        const updated = await res.json();
+        // update local list
+        currentReports = currentReports.map(r => r._id === updated._id ? updated : r);
+        renderReports();
+        updateStats();
+        showMessage(formMsg, "Status updated", 1800);
+      } catch (err) {
+        console.error(err);
+        showMessage(formMsg, "Could not update status", 3000);
+      }
+    }
+
+    // ---------- submit the form ----------
+    reportForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      formMsg.textContent = "Submitting…";
+      const name = document.getElementById("name").value.trim();
+      const location = document.getElementById("location").value.trim();
+      const description = document.getElementById("description").value.trim();
+
+      // If you want to support image upload you need either:
+      //  1) a backend route to accept multipart/form-data and store image (Cloudinary, FS, etc.)
+      //  2) upload to external storage and include URL in body
+      // For simplicity we'll send image as base64 only if selected (works for small images)
+      let imageUrl = "";
+      if (imgInput.files && imgInput.files[0]) {
+        try {
+          imageUrl = await readFileAsBase64(imgInput.files[0]);
+        } catch(e) { console.warn("image read failed", e); }
+      }
+
+      const payload = { name, location, description };
+      if (imageUrl) payload.imageUrl = imageUrl;
+
+      try {
+        const res = await fetch(API_URL + "/report", {
+          method: "POST",
+          headers: { "Content-Type":"application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error("Submit failed");
+        const created = await res.json();
+        // add to local list and re-render
+        currentReports = [created, ...currentReports];
+        renderReports();
+        updateStats();
+        reportForm.reset();
+        imgPreview.style.display = "none";
+        showMessage(formMsg, "Report submitted ✓", 2200);
+      } catch (err) {
+        console.error(err);
+        showMessage(formMsg, "Submission failed. Is the backend running?", 3500);
+      }
+    });
+
+    clearBtn.addEventListener("click", () => {
+      reportForm.reset();
+      imgPreview.style.display = "none";
+    });
+
+    refreshBtn.addEventListener("click", loadReports);
+
+    // ---------- update dashboard stats ----------
+    function updateStats() {
+      const total = currentReports.length;
+      const resolved = currentReports.filter(r => r.status === "Resolved").length;
+      const pending = total - resolved;
+      statsEl.innerHTML = `
+        <div><strong>Total:</strong> ${total}</div>
+        <div><strong>Pending:</strong> ${pending}</div>
+        <div><strong>Resolved:</strong> ${resolved}</div>
+      `;
+    }
+
+    // ---------- small utilities ----------
+    function escapeHtml(s){
+      if(!s) return "";
+      return String(s).replace(/[&<>"']/g, function(m){
+        return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m];
+      });
+    }
+
+    function readFileAsBase64(file){
+      return new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = () => rej(new Error("read error"));
+        r.readAsDataURL(file);
+      });
+    }
+
+    // initial load
+    loadReports();
+  </script>
+</body>
+</html>
